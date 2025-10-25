@@ -6,7 +6,7 @@ from tqdm import tqdm
 import time
 
 # --- CONFIG ---
-API_KEY = ""  # 🔑 Replace this with your key
+API_KEY = "AIzaSyBW12XVD4xOBHzHyxjm051U_jZppZs2gIs"  # 🔑 Replace this with your key
 MAX_RESULTS = 150 # Set the maximum number of results you want to retrieve
 
 # --- INPUTS ---
@@ -87,7 +87,7 @@ import pandas as pd
 from datetime import datetime
 
 # === HUBSPOT CONFIGURATION ===
-HUBSPOT_API_KEY = ""  # 🔑 Replace this with your HubSpot private app key
+HUBSPOT_API_KEY = "pat-eu1-adf2aaa1-6606-4e45-b98f-cf1fb18ba09f"  # 🔑 Replace this with your HubSpot private app key
 BASE_URL = "https://api.hubapi.com"
 COMPANY_URL = f"{BASE_URL}/crm/v3/objects/companies"
 
