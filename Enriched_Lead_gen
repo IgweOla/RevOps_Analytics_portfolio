@@ -19,8 +19,8 @@ executive contact details using **Google Maps** and **Clay AI**.
 """)
 
 # === API KEYS FROM SECRETS ===
-GOOGLE_API_KEY = st.secrets["AIzaSyBW12XVD4xOBHzHyxjm051U_jZppZs2gIs"]
-CLAY_API_KEY = st.secrets["76fcf03cff6d617a2132"]
+GOOGLE_API_KEY = st.secrets[""]
+CLAY_API_KEY = st.secrets[""]
 
 # === USER INPUTS ===
 st.sidebar.header("🔧 Input Settings")
