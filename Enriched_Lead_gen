@@ -1,0 +1,140 @@
+# 🌊 Coral by The Reef (v3)
+# Google Maps Lead Generation + Clay AI Enrichment
+# Author: Ola
+
+import streamlit as st
+import pandas as pd
+import requests
+import time
+
+# === CONFIGURATION ===
+st.set_page_config(page_title="Coral by The Reef", page_icon="🌊", layout="wide")
+
+st.title("🌊 Coral by The Reef")
+st.caption("Smart Lead Generation + Executive Enrichment")
+
+st.markdown("""
+Coral helps RevOps and Growth teams find qualified businesses and enrich them with
+executive contact details using **Google Maps** and **Clay AI**.
+""")
+
+# === API KEYS FROM SECRETS ===
+GOOGLE_API_KEY = st.secrets["AIzaSyBW12XVD4xOBHzHyxjm051U_jZppZs2gIs"]
+CLAY_API_KEY = st.secrets["76fcf03cff6d617a2132"]
+
+# === USER INPUTS ===
+st.sidebar.header("🔧 Input Settings")
+keyword = st.sidebar.text_input("Business Type", "dentist")
+location = st.sidebar.text_input("Location", "Ikeja Lagos")
+radius = st.sidebar.number_input("Radius (meters)", min_value=1000, max_value=50000, value=10000)
+max_results = st.sidebar.slider("Max Results", 20, 200, 100)
+run = st.sidebar.button("🚀 Generate & Enrich Leads")
+
+# === FUNCTION: FETCH FROM GOOGLE PLACES ===
+def fetch_places(keyword, location, radius, max_results):
+    url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+    params = {
+        "query": f"{keyword} in {location}",
+        "radius": radius,
+        "key": GOOGLE_API_KEY
+    }
+
+    all_places = []
+    next_page_token = None
+
+    while len(all_places) < max_results:
+        r = requests.get(url, params=params)
+        data = r.json()
+
+        if r.status_code != 200 or data.get("status") != "OK":
+            st.error(f"Google API Error: {data.get('error_message', 'Unknown error')}")
+            break
+
+        places = data.get("results", [])
+        all_places.extend(places)
+
+        next_page_token = data.get("next_page_token")
+        if not next_page_token or len(all_places) >= max_results:
+            break
+        time.sleep(2)
+        params = {"pagetoken": next_page_token, "key": GOOGLE_API_KEY}
+
+    df = pd.DataFrame([{
+        "Name": p.get("name"),
+        "Address": p.get("formatted_address"),
+        "Place_ID": p.get("place_id"),
+        "Maps_URL": f"https://www.google.com/maps/place/?q=place_id:{p.get('place_id')}"
+    } for p in all_places])
+
+    return df.head(max_results)
+
+# === FUNCTION: CLAY ENRICHMENT (v2 API) ===
+def enrich_with_clay(df):
+    enriched_data = []
+    headers = {
+        "Authorization": f"Bearer {CLAY_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    for _, row in df.iterrows():
+        query = row["Name"]
+        payload = {
+            "query": query,
+            "types": ["company", "person"],
+            "limit": 1
+        }
+
+        try:
+            resp = requests.post("https://api.clay.com/v2/find", headers=headers, json=payload)
+            if resp.status_code != 200:
+                st.warning(f"Clay API Error for {query}: {resp.text}")
+                continue
+
+            data = resp.json()
+            result = data.get("results", [{}])[0]
+
+            enriched_data.append({
+                "Business": row["Name"],
+                "Address": row["Address"],
+                "Website": result.get("domain"),
+                "LinkedIn": result.get("linkedin_url"),
+                "Contact Name": result.get("person_name"),
+                "Role": result.get("person_title"),
+                "Email": result.get("email"),
+                "Phone": result.get("phone_number"),
+                "Confidence": result.get("confidence"),
+                "Maps_URL": row["Maps_URL"]
+            })
+        except Exception as e:
+            st.warning(f"Error enriching {query}: {e}")
+            continue
+
+        time.sleep(0.2)
+
+    return pd.DataFrame(enriched_data)
+
+# === MAIN WORKFLOW ===
+if run:
+    with st.spinner("Fetching businesses from Google Maps..."):
+        df = fetch_places(keyword, location, radius, max_results)
+        if df.empty:
+            st.error("No results found. Please try another location or keyword.")
+            st.stop()
+        st.success(f"✅ Retrieved {len(df)} businesses.")
+        st.dataframe(df)
+
+    with st.spinner("Enriching leads with Clay AI..."):
+        enriched_df = enrich_with_clay(df)
+        st.success(f"🎉 Enriched {len(enriched_df)} businesses.")
+        st.dataframe(enriched_df)
+
+        csv = enriched_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="💾 Download Enriched CSV",
+            data=csv,
+            file_name=f"{keyword}_{location}_executives.csv",
+            mime="text/csv"
+        )
+
+st.markdown("---")
+st.caption("Built with ❤️ by The Reef | Coral v3")
