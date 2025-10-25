@@ -1,140 +1,167 @@
-# 🌊 Coral by The Reef (v3)
-# Google Maps Lead Generation + Clay AI Enrichment
-# Author: Ola
+!pip install requests pandas tqdm
 
-import streamlit as st
-import pandas as pd
 import requests
+import pandas as pd
+from tqdm import tqdm
 import time
 
-# === CONFIGURATION ===
-st.set_page_config(page_title="Coral by The Reef", page_icon="🌊", layout="wide")
+# --- CONFIG ---
+API_KEY = ""  # 🔑 Replace this with your key
+MAX_RESULTS = 150 # Set the maximum number of results you want to retrieve
 
-st.title("🌊 Coral by The Reef")
-st.caption("Smart Lead Generation + Executive Enrichment")
+# --- INPUTS ---
+keyword = input("Enter business type (e.g. 'dentist', 'restaurant', 'marketing agency'): ")
+location = input("Enter location (e.g. 'Ikeja Lagos', 'Abuja', 'Port Harcourt'): ")
+radius = 10000  # meters
 
-st.markdown("""
-Coral helps RevOps and Growth teams find qualified businesses and enrich them with
-executive contact details using **Google Maps** and **Clay AI**.
-""")
+# --- PHASE 1: BASIC PLACE SEARCH WITH PAGINATION ---
+search_url = f"https://maps.googleapis.com/maps/api/place/textsearch/json?query={keyword}+in+{location}&radius={radius}&key={API_KEY}"
+all_places = []
+next_page_token = None
 
-# === API KEYS FROM SECRETS ===
-GOOGLE_API_KEY = st.secrets[""]
-CLAY_API_KEY = st.secrets[""]
+while len(all_places) < MAX_RESULTS:
+    if next_page_token:
+        search_url = f"https://maps.googleapis.com/maps/api/place/textsearch/json?pagetoken={next_page_token}&key={API_KEY}"
+    elif all_places: # Only request first page once
+      break # Exit loop if no next_page_token and not the first page
 
-# === USER INPUTS ===
-st.sidebar.header("🔧 Input Settings")
-keyword = st.sidebar.text_input("Business Type", "dentist")
-location = st.sidebar.text_input("Location", "Ikeja Lagos")
-radius = st.sidebar.number_input("Radius (meters)", min_value=1000, max_value=50000, value=10000)
-max_results = st.sidebar.slider("Max Results", 20, 200, 100)
-run = st.sidebar.button("🚀 Generate & Enrich Leads")
 
-# === FUNCTION: FETCH FROM GOOGLE PLACES ===
-def fetch_places(keyword, location, radius, max_results):
-    url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+    response = requests.get(search_url)
+    data = response.json()
+
+    places = data.get("results", [])
+    all_places.extend(places)
+    print(f"✅ Found {len(places)} results in this page. Total results: {len(all_places)}")
+
+    next_page_token = data.get("next_page_token")
+
+    if not next_page_token or len(places) == 0:
+        break
+    time.sleep(2) # Add a delay to avoid rate limiting
+
+print(f"✅ Finished collecting initial results. Total results: {len(all_places)}")
+
+# --- PHASE 2: PLACE DETAILS ENRICHMENT ---
+details_url = "https://maps.googleapis.com/maps/api/place/details/json"
+enriched_data = []
+
+# Limit the number of places to process based on MAX_RESULTS
+places_to_process = all_places[:MAX_RESULTS]
+
+
+for place in tqdm(places_to_process, desc="Enriching leads"):
+    place_id = place.get("place_id")
     params = {
-        "query": f"{keyword} in {location}",
-        "radius": radius,
-        "key": GOOGLE_API_KEY
+        "place_id": place_id,
+        "fields": "name,formatted_address,formatted_phone_number,website,rating,opening_hours,geometry",
+        "key": API_KEY
     }
+    details_resp = requests.get(details_url, params=params).json()
+    details = details_resp.get("result", {})
 
-    all_places = []
-    next_page_token = None
+    enriched_data.append({
+        "Name": details.get("name"),
+        "Address": details.get("formatted_address"),
+        "Phone": details.get("formatted_phone_number"),
+        "Website": details.get("website"),
+        "Rating": details.get("rating"),
+        "Open_Now": details.get("opening_hours", {}).get("open_now") if details.get("opening_hours") else None,
+        "Maps_URL": f"https://www.google.com/maps/place/?q=place_id:{place_id}",
+        "Location": location # Add the location to the DataFrame
+    })
 
-    while len(all_places) < max_results:
-        r = requests.get(url, params=params)
-        data = r.json()
+df = pd.DataFrame(enriched_data)
 
-        if r.status_code != 200 or data.get("status") != "OK":
-            st.error(f"Google API Error: {data.get('error_message', 'Unknown error')}")
-            break
+# --- EXPORT ---
+file_name = f"{keyword}_{location}_enriched_leads.csv".replace(" ", "_")
+df.to_csv(file_name, index=False)
 
-        places = data.get("results", [])
-        all_places.extend(places)
+print(f"💾 Exported {len(df)} enriched leads to '{file_name}'")
 
-        next_page_token = data.get("next_page_token")
-        if not next_page_token or len(all_places) >= max_results:
-            break
-        time.sleep(2)
-        params = {"pagetoken": next_page_token, "key": GOOGLE_API_KEY}
+from google.colab import files
+files.download(file_name)
 
-    df = pd.DataFrame([{
-        "Name": p.get("name"),
-        "Address": p.get("formatted_address"),
-        "Place_ID": p.get("place_id"),
-        "Maps_URL": f"https://www.google.com/maps/place/?q=place_id:{p.get('place_id')}"
-    } for p in all_places])
+import requests
+import time
+import pandas as pd
+from datetime import datetime
 
-    return df.head(max_results)
+# === HUBSPOT CONFIGURATION ===
+HUBSPOT_API_KEY = ""  # 🔑 Replace this with your HubSpot private app key
+BASE_URL = "https://api.hubapi.com"
+COMPANY_URL = f"{BASE_URL}/crm/v3/objects/companies"
 
-# === FUNCTION: CLAY ENRICHMENT (v2 API) ===
-def enrich_with_clay(df):
-    enriched_data = []
-    headers = {
-        "Authorization": f"Bearer {CLAY_API_KEY}",
-        "Content-Type": "application/json"
-    }
+headers = {
+    "Authorization": f"Bearer {HUBSPOT_API_KEY}",
+    "Content-Type": "application/json"
+}
 
-    for _, row in df.iterrows():
-        query = row["Name"]
-        payload = {
-            "query": query,
-            "types": ["company", "person"],
-            "limit": 1
+# === FUNCTION: CHECK IF COMPANY EXISTS ===
+def company_exists(domain=None, name=None):
+    """Checks HubSpot for existing company by domain or name."""
+    search_url = f"{BASE_URL}/crm/v3/objects/companies/search"
+    filters = []
+
+    if domain:
+        filters.append({"propertyName": "domain", "operator": "EQ", "value": domain})
+    if name and not domain:
+        filters.append({"propertyName": "name", "operator": "EQ", "value": name})
+
+    if not filters:
+        return False
+
+    payload = {"filterGroups": [{"filters": filters}]}
+    resp = requests.post(search_url, headers=headers, json=payload)
+
+    if resp.status_code != 200:
+        print(f"⚠️ Search error for {name}: {resp.text}")
+        return False
+
+    results = resp.json().get("results", [])
+    return len(results) > 0
+
+
+# === FUNCTION: CREATE COMPANY ===
+def create_company(row):
+    """Creates company in HubSpot if not already existing."""
+    if company_exists(domain=row["Website"], name=row["Name"]):
+        return {"Name": row["Name"], "Status": "Duplicate", "Timestamp": datetime.now()}
+
+    data = {
+        "properties": {
+            "name": row["Name"],
+            "address": row["Address"],
+            "phone": row["Phone"] or "",
+            "domain": row["Website"] if row["Website"] else "",
+            "city": row["Location"],
         }
+    }
 
-        try:
-            resp = requests.post("https://api.clay.com/v2/find", headers=headers, json=payload)
-            if resp.status_code != 200:
-                st.warning(f"Clay API Error for {query}: {resp.text}")
-                continue
+    response = requests.post(COMPANY_URL, headers=headers, json=data)
 
-            data = resp.json()
-            result = data.get("results", [{}])[0]
+    if response.status_code == 201:
+        print(f"✅ Added company: {row['Name']}")
+        return {"Name": row["Name"], "Status": "Added", "Timestamp": datetime.now()}
+    else:
+        print(f"❌ Failed for {row['Name']}: {response.text}")
+        return {"Name": row["Name"], "Status": "Failed", "Timestamp": datetime.now()}
 
-            enriched_data.append({
-                "Business": row["Name"],
-                "Address": row["Address"],
-                "Website": result.get("domain"),
-                "LinkedIn": result.get("linkedin_url"),
-                "Contact Name": result.get("person_name"),
-                "Role": result.get("person_title"),
-                "Email": result.get("email"),
-                "Phone": result.get("phone_number"),
-                "Confidence": result.get("confidence"),
-                "Maps_URL": row["Maps_URL"]
-            })
-        except Exception as e:
-            st.warning(f"Error enriching {query}: {e}")
-            continue
 
-        time.sleep(0.2)
+# === LOOP THROUGH LEADS AND PUSH TO HUBSPOT ===
+sync_log = []
 
-    return pd.DataFrame(enriched_data)
+for i, row in df.iterrows():
+    result = create_company(row)
+    sync_log.append(result)
+    time.sleep(0.3)  # Prevent API rate limit issues
 
-# === MAIN WORKFLOW ===
-if run:
-    with st.spinner("Fetching businesses from Google Maps..."):
-        df = fetch_places(keyword, location, radius, max_results)
-        if df.empty:
-            st.error("No results found. Please try another location or keyword.")
-            st.stop()
-        st.success(f"✅ Retrieved {len(df)} businesses.")
-        st.dataframe(df)
+# === EXPORT SYNC LOG ===
+log_df = pd.DataFrame(sync_log)
+log_file_name = f"company_sync_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+log_df.to_csv(log_file_name, index=False)
 
-    with st.spinner("Enriching leads with Clay AI..."):
-        enriched_df = enrich_with_clay(df)
-        st.success(f"🎉 Enriched {len(enriched_df)} businesses.")
-        st.dataframe(enriched_df)
+print(f"📊 Sync Log saved as {log_file_name}")
 
-        csv = enriched_df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="💾 Download Enriched CSV",
-            data=csv,
-            file_name=f"{keyword}_{location}_executives.csv",
-            mime="text/csv"
-        )
+from google.colab import files
+files.download(log_file_name)
 
-st.markdown("---")
-st.caption("Built with ❤️ by The Reef | Coral v3")
