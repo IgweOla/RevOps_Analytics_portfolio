@@ -1,15 +1,22 @@
-import pip
-
-
-pip install requests pandas tqdm
+# Install required packages in your terminal (do not run pip install as a bare statement in this script):
+# pip install requests pandas tqdm python-dotenv
 
 import requests
 import pandas as pd
 from tqdm import tqdm
 import time
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env in repo root
+load_dotenv(r"c:\Users\DELL\Downloads\Revops Code\RevOps_Analytics_portfolio\.env")
 
 # --- CONFIG ---
-API_KEY = "AIzaSyBW12XVD4xOBHzHyxjm051U_jZppZs2gIs"  # 🔑 Replace this with your key
+# Get API keys from environment instead of hard-coding
+API_KEY = os.getenv("GOOGLE_API_KEY")
+if not API_KEY:
+    raise RuntimeError("GOOGLE_API_KEY not found in environment. Add it to the .env file.")
+
 MAX_RESULTS = 150 # Set the maximum number of results you want to retrieve
 
 # --- INPUTS ---
