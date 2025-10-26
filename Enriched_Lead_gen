@@ -1,4 +1,7 @@
-!pip install requests pandas tqdm
+import pip
+
+
+pip install requests pandas tqdm
 
 import requests
 import pandas as pd
