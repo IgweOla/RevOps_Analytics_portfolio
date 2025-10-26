@@ -1,0 +1,5 @@
+```.gitignore
+# Ignore the .env file.
+.env
+```
+Enriched_Lead_gen
