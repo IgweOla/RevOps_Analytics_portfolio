@@ -81,87 +81,33 @@ print(f"💾 Exported {len(df)} enriched leads to '{file_name}'")
 from google.colab import files
 files.download(file_name)
 
-import requests
-import time
-import pandas as pd
-from datetime import datetime
+# --- GIT CONFIG HELP (added) ---
+def print_git_config_instructions():
+    """
+    Prints concise git config commands and verification steps.
+    Use --global to set for all repos, omit --global to set for current repo only.
+    """
+    cmds = [
+        'Set globally:',
+        '  git config --global user.name "Your Name"',
+        '  git config --global user.email "you@example.com"',
+        '',
+        'Set for current repo only (run inside repo):',
+        '  git config user.name "Your Name"',
+        '  git config user.email "you@example.com"',
+        '',
+        'Verify:',
+        '  git config --list',
+        '  git config user.name',
+        '  git config user.email',
+        '',
+        'Edit global config file:',
+        '  git config --global --edit',
+        '',
+        'Windows global file path:',
+        r'  C:\Users\<YourUser>\.gitconfig'
+    ]
+    print("\n".join(cmds))
 
-# === HUBSPOT CONFIGURATION ===
-HUBSPOT_API_KEY = "pat-eu1-adf2aaa1-6606-4e45-b98f-cf1fb18ba09f"  # 🔑 Replace this with your HubSpot private app key
-BASE_URL = "https://api.hubapi.com"
-COMPANY_URL = f"{BASE_URL}/crm/v3/objects/companies"
-
-headers = {
-    "Authorization": f"Bearer {HUBSPOT_API_KEY}",
-    "Content-Type": "application/json"
-}
-
-# === FUNCTION: CHECK IF COMPANY EXISTS ===
-def company_exists(domain=None, name=None):
-    """Checks HubSpot for existing company by domain or name."""
-    search_url = f"{BASE_URL}/crm/v3/objects/companies/search"
-    filters = []
-
-    if domain:
-        filters.append({"propertyName": "domain", "operator": "EQ", "value": domain})
-    if name and not domain:
-        filters.append({"propertyName": "name", "operator": "EQ", "value": name})
-
-    if not filters:
-        return False
-
-    payload = {"filterGroups": [{"filters": filters}]}
-    resp = requests.post(search_url, headers=headers, json=payload)
-
-    if resp.status_code != 200:
-        print(f"⚠️ Search error for {name}: {resp.text}")
-        return False
-
-    results = resp.json().get("results", [])
-    return len(results) > 0
-
-
-# === FUNCTION: CREATE COMPANY ===
-def create_company(row):
-    """Creates company in HubSpot if not already existing."""
-    if company_exists(domain=row["Website"], name=row["Name"]):
-        return {"Name": row["Name"], "Status": "Duplicate", "Timestamp": datetime.now()}
-
-    data = {
-        "properties": {
-            "name": row["Name"],
-            "address": row["Address"],
-            "phone": row["Phone"] or "",
-            "domain": row["Website"] if row["Website"] else "",
-            "city": row["Location"],
-        }
-    }
-
-    response = requests.post(COMPANY_URL, headers=headers, json=data)
-
-    if response.status_code == 201:
-        print(f"✅ Added company: {row['Name']}")
-        return {"Name": row["Name"], "Status": "Added", "Timestamp": datetime.now()}
-    else:
-        print(f"❌ Failed for {row['Name']}: {response.text}")
-        return {"Name": row["Name"], "Status": "Failed", "Timestamp": datetime.now()}
-
-
-# === LOOP THROUGH LEADS AND PUSH TO HUBSPOT ===
-sync_log = []
-
-for i, row in df.iterrows():
-    result = create_company(row)
-    sync_log.append(result)
-    time.sleep(0.3)  # Prevent API rate limit issues
-
-# === EXPORT SYNC LOG ===
-log_df = pd.DataFrame(sync_log)
-log_file_name = f"company_sync_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-log_df.to_csv(log_file_name, index=False)
-
-print(f"📊 Sync Log saved as {log_file_name}")
-
-from google.colab import files
-files.download(log_file_name)
-
+# Optionally call the helper (uncomment to print when this script runs)
+# print_git_config_instructions()
