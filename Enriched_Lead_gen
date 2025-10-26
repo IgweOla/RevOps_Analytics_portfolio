@@ -1,22 +1,12 @@
-# Install required packages in your terminal (do not run pip install as a bare statement in this script):
-# pip install requests pandas tqdm python-dotenv
+%pip install requests pandas tqdm
 
 import requests
 import pandas as pd
 from tqdm import tqdm
 import time
-import os
-from dotenv import load_dotenv
-
-# Load environment variables from .env in repo root
-load_dotenv(r"c:\Users\DELL\Downloads\Revops Code\RevOps_Analytics_portfolio\.env")
 
 # --- CONFIG ---
-# Get API keys from environment instead of hard-coding
-API_KEY = os.getenv("GOOGLE_API_KEY")
-if not API_KEY:
-    raise RuntimeError("GOOGLE_API_KEY not found in environment. Add it to the .env file.")
-
+API_KEY = "AIzaSyBW12XVD4xOBHzHyxjm051U_jZppZs2gIs"  # 🔑 Replace this with your key
 MAX_RESULTS = 150 # Set the maximum number of results you want to retrieve
 
 # --- INPUTS ---
@@ -87,37 +77,3 @@ file_name = f"{keyword}_{location}_enriched_leads.csv".replace(" ", "_")
 df.to_csv(file_name, index=False)
 
 print(f"💾 Exported {len(df)} enriched leads to '{file_name}'")
-
-from google.colab import files
-files.download(file_name)
-
-# --- GIT CONFIG HELP (added) ---
-def print_git_config_instructions():
-    """
-    Prints concise git config commands and verification steps.
-    Use --global to set for all repos, omit --global to set for current repo only.
-    """
-    cmds = [
-        'Set globally:',
-        '  git config --global user.name "Your Name"',
-        '  git config --global user.email "you@example.com"',
-        '',
-        'Set for current repo only (run inside repo):',
-        '  git config user.name "Your Name"',
-        '  git config user.email "you@example.com"',
-        '',
-        'Verify:',
-        '  git config --list',
-        '  git config user.name',
-        '  git config user.email',
-        '',
-        'Edit global config file:',
-        '  git config --global --edit',
-        '',
-        'Windows global file path:',
-        r'  C:\Users\<YourUser>\.gitconfig'
-    ]
-    print("\n".join(cmds))
-
-# Optionally call the helper (uncomment to print when this script runs)
-# print_git_config_instructions()
